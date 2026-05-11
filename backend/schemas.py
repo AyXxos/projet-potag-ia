@@ -36,6 +36,9 @@ class ToPlant(ToPlantBase):
 class LibraryItemBase(BaseModel):
     name: str
     period: str
+    plantingStart: date
+    plantingEnd: date
+    plantingDate: date
     season: str
     waterNeeds: str
     tips: str

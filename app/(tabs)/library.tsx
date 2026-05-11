@@ -1,7 +1,9 @@
-import { Calendar, Droplets, Info, Search, Sun } from "lucide-react-native";
+import { Calendar, Search, Sun } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
     ActivityIndicator,
+    Modal,
+    Pressable,
     ScrollView,
     StyleSheet,
     Text,
@@ -13,6 +15,8 @@ export default function LibraryScreen() {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedItem, setSelectedItem] = useState<any | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
 
   useEffect(() => {
     fetch("http://172.23.119.189:8000/api/library")
@@ -30,6 +34,33 @@ export default function LibraryScreen() {
   const filteredLibrary = data.filter((item) =>
     item.name.toLowerCase().includes(searchTerm.toLowerCase()),
   );
+
+  const formatDayMonth = (value?: string) => {
+    if (!value) {
+      return "Non defini";
+    }
+
+    const dateValue = new Date(value);
+    if (Number.isNaN(dateValue.getTime())) {
+      return "Non defini";
+    }
+
+    return dateValue.toLocaleDateString("fr-FR", {
+      day: "numeric",
+      month: "long",
+    });
+  };
+
+  const formatWeekRange = (start?: string, end?: string) => {
+    const startLabel = formatDayMonth(start);
+    const endLabel = formatDayMonth(end);
+
+    if (startLabel === "Non defini" || endLabel === "Non defini") {
+      return "Non defini";
+    }
+
+    return `${startLabel} au ${endLabel}`;
+  };
 
   return (
     <View style={styles.container}>
@@ -52,7 +83,14 @@ export default function LibraryScreen() {
       ) : (
         <ScrollView contentContainerStyle={{ paddingBottom: 30 }}>
           {filteredLibrary.map((item) => (
-            <View key={item.id} style={styles.card}>
+            <Pressable
+              key={item.id}
+              style={styles.card}
+              onPress={() => {
+                setSelectedItem(item);
+                setModalVisible(true);
+              }}
+            >
               <View style={styles.cardHeader}>
                 <Text style={styles.cardTitle}>{item.name}</Text>
               </View>
@@ -60,7 +98,10 @@ export default function LibraryScreen() {
                 <View style={styles.row}>
                   <Calendar color="#10B981" size={16} style={styles.rowIcon} />
                   <Text style={styles.rowText}>
-                    Période : <Text style={styles.bold}>{item.period}</Text>
+                    Semaine :{" "}
+                    <Text style={styles.bold}>
+                      {formatWeekRange(item.plantingStart, item.plantingEnd)}
+                    </Text>
                   </Text>
                 </View>
                 <View style={styles.row}>
@@ -69,26 +110,8 @@ export default function LibraryScreen() {
                     Saison : <Text style={styles.bold}>{item.season}</Text>
                   </Text>
                 </View>
-                <View style={styles.row}>
-                  <Droplets color="#3B82F6" size={16} style={styles.rowIcon} />
-                  <Text style={styles.rowText}>
-                    Eau : <Text style={styles.bold}>{item.waterNeeds}</Text>
-                  </Text>
-                </View>
-
-                <View style={styles.tipsBox}>
-                  <Info
-                    color="#059669"
-                    size={16}
-                    style={{ marginTop: 2, marginRight: 8 }}
-                  />
-                  <Text style={styles.tipsText}>
-                    <Text style={{ fontWeight: "bold" }}>Conseil : </Text>
-                    {item.tips}
-                  </Text>
-                </View>
               </View>
-            </View>
+            </Pressable>
           ))}
 
           {filteredLibrary.length === 0 && (
@@ -98,6 +121,51 @@ export default function LibraryScreen() {
           )}
         </ScrollView>
       )}
+
+      <Modal
+        visible={modalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>
+              {selectedItem?.name ?? "Legume"}
+            </Text>
+            <View style={styles.modalSection}>
+              <Text style={styles.modalLabel}>Date de plantation</Text>
+              <Text style={styles.modalValue}>
+                {formatDayMonth(selectedItem?.plantingDate)}
+              </Text>
+            </View>
+            <View style={styles.modalSection}>
+              <Text style={styles.modalLabel}>Saison ideale</Text>
+              <Text style={styles.modalValue}>
+                {selectedItem?.season ?? "Non defini"}
+              </Text>
+            </View>
+            <View style={styles.modalSection}>
+              <Text style={styles.modalLabel}>Besoins en eau (par jour)</Text>
+              <Text style={styles.modalValue}>
+                {selectedItem?.waterNeeds ?? "Non defini"}
+              </Text>
+            </View>
+            <View style={styles.modalSection}>
+              <Text style={styles.modalLabel}>Conseils</Text>
+              <Text style={styles.modalValue}>
+                {selectedItem?.tips ?? "Aucun conseil"}
+              </Text>
+            </View>
+            <Pressable
+              style={styles.modalCloseButton}
+              onPress={() => setModalVisible(false)}
+            >
+              <Text style={styles.modalCloseText}>Fermer</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -137,15 +205,34 @@ const styles = StyleSheet.create({
   rowIcon: { marginRight: 12 },
   rowText: { color: "#4B5563", fontSize: 14 },
   bold: { fontWeight: "bold", color: "#1F2937" },
-  tipsBox: {
-    flexDirection: "row",
-    backgroundColor: "rgba(209, 250, 229, 0.5)",
-    padding: 12,
-    borderRadius: 12,
-    marginTop: 12,
-    borderColor: "#D1FAE5",
-    borderWidth: 1,
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.5)",
+    justifyContent: "center",
+    padding: 20,
   },
-  tipsText: { color: "#065f46", fontSize: 12, flex: 1, lineHeight: 18 },
+  modalCard: { backgroundColor: "#fff", borderRadius: 16, padding: 20 },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#065f46",
+    marginBottom: 12,
+  },
+  modalSection: { marginBottom: 12 },
+  modalLabel: {
+    fontSize: 12,
+    textTransform: "uppercase",
+    color: "#9CA3AF",
+    marginBottom: 4,
+  },
+  modalValue: { fontSize: 14, color: "#111827", lineHeight: 20 },
+  modalCloseButton: {
+    marginTop: 8,
+    backgroundColor: "#047857",
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  modalCloseText: { color: "#fff", fontWeight: "bold" },
   emptyText: { textAlign: "center", color: "#6B7280", marginTop: 40 },
 });
