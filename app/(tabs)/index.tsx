@@ -13,7 +13,12 @@ import {
 export default function DashboardScreen() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState<number | null>(null);
+  const [viewMonthIndex, setViewMonthIndex] = useState(4); // Mai 2026
+  const [selectedDate, setSelectedDate] = useState<{
+    year: number;
+    monthIndex: number;
+    day: number;
+  } | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
   useEffect(() => {
@@ -31,9 +36,12 @@ export default function DashboardScreen() {
   }, []);
 
   const now = new Date();
-  const year = now.getFullYear();
-  const monthIndex = now.getMonth();
+  const currentYear = now.getFullYear();
+  const currentMonthIndex = now.getMonth();
   const todayDate = now.getDate();
+  const viewYear = 2026;
+  const minMonthIndex = 4; // Mai
+  const maxMonthIndex = 8; // Septembre
   const monthNames = [
     "Janvier",
     "Fevrier",
@@ -49,20 +57,26 @@ export default function DashboardScreen() {
     "Decembre",
   ];
   const weekdayLabels = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
-  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
-  const firstDayIndex = (new Date(year, monthIndex, 1).getDay() + 6) % 7;
-  const calendarCells = Array.from(
-    { length: firstDayIndex + daysInMonth },
-    (_, i) => (i < firstDayIndex ? null : i - firstDayIndex + 1),
-  );
   const tomatoVarietiesByDay: Record<number, string[]> = {
-    15: ["Roma", "Saint Pierre"],
-    18: ["Coeur de boeuf"],
-    25: ["Noire de Crimee", "Cerise"],
+    12: ["Tomate Cerise Sweet Million"],
+    15: ["Tomate Cœur de Bœuf"],
+    18: ["Tomate Noire de Crimée"],
+    22: ["Tomate San Marzano"],
   };
   const tomatoDays = Object.keys(tomatoVarietiesByDay).map((day) =>
     Number(day),
   );
+
+  const canGoPrev = viewMonthIndex > minMonthIndex;
+  const canGoNext = viewMonthIndex < maxMonthIndex;
+
+  const buildCalendarCells = (year: number, monthIndex: number) => {
+    const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+    const firstDayIndex = (new Date(year, monthIndex, 1).getDay() + 6) % 7;
+    return Array.from({ length: firstDayIndex + daysInMonth }, (_, i) =>
+      i < firstDayIndex ? null : i - firstDayIndex + 1,
+    );
+  };
 
   if (loading) {
     return (
@@ -85,9 +99,23 @@ export default function DashboardScreen() {
           <Text style={styles.sectionTitle}>Calendrier</Text>
         </View>
         <View style={styles.calendarCard}>
-          <Text style={styles.monthTitle}>
-            {monthNames[monthIndex]} {year}
-          </Text>
+          <View style={styles.monthHeaderRow}>
+            <Pressable
+              style={[styles.navButton, !canGoPrev && styles.navButtonDisabled]}
+              onPress={() => canGoPrev && setViewMonthIndex(viewMonthIndex - 1)}
+            >
+              <Text style={styles.navButtonText}>‹</Text>
+            </Pressable>
+            <Text style={styles.monthTitle}>
+              {monthNames[viewMonthIndex]} {viewYear}
+            </Text>
+            <Pressable
+              style={[styles.navButton, !canGoNext && styles.navButtonDisabled]}
+              onPress={() => canGoNext && setViewMonthIndex(viewMonthIndex + 1)}
+            >
+              <Text style={styles.navButtonText}>›</Text>
+            </Pressable>
+          </View>
           <View style={styles.weekdayRow}>
             {weekdayLabels.map((label) => (
               <Text key={label} style={styles.weekdayText}>
@@ -96,18 +124,25 @@ export default function DashboardScreen() {
             ))}
           </View>
           <View style={styles.calendarGrid}>
-            {calendarCells.map((date, index) => {
+            {buildCalendarCells(viewYear, viewMonthIndex).map((date, index) => {
               if (!date) {
                 return <View key={`empty-${index}`} style={styles.emptyCell} />;
               }
 
-              const isToday = date === todayDate;
+              const isToday =
+                date === todayDate &&
+                viewYear === currentYear &&
+                viewMonthIndex === currentMonthIndex;
               const isTomatoDay = tomatoDays.includes(date);
               return (
                 <Pressable
                   key={date}
                   onPress={() => {
-                    setSelectedDate(date);
+                    setSelectedDate({
+                      year: viewYear,
+                      monthIndex: viewMonthIndex,
+                      day: date,
+                    });
                     setModalVisible(true);
                   }}
                   style={[styles.dayCell, isToday && styles.todayItem]}
@@ -138,15 +173,15 @@ export default function DashboardScreen() {
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>
               {selectedDate
-                ? `${selectedDate} ${monthNames[monthIndex]} ${year}`
+                ? `${selectedDate.day} ${monthNames[selectedDate.monthIndex]} ${selectedDate.year}`
                 : "Jour"}
             </Text>
             <Text style={styles.modalSubtitle}>Infos du jour</Text>
             <View style={styles.modalSection}>
               <Text style={styles.modalLabel}>Plantation recommandee</Text>
               <Text style={styles.modalValue}>
-                {selectedDate && tomatoVarietiesByDay[selectedDate]?.length
-                  ? `Tomates: ${tomatoVarietiesByDay[selectedDate].join(", ")}`
+                {selectedDate && tomatoVarietiesByDay[selectedDate.day]?.length
+                  ? `Tomates: ${tomatoVarietiesByDay[selectedDate.day].join(", ")}`
                   : "Aucune recommandation"}
               </Text>
             </View>
@@ -246,12 +281,27 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#D1FAE5",
   },
+  monthHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
   monthTitle: {
     fontSize: 16,
     fontWeight: "bold",
     color: "#065f46",
-    marginBottom: 12,
   },
+  navButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#ECFDF5",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  navButtonDisabled: { opacity: 0.4 },
+  navButtonText: { fontSize: 20, color: "#065f46", fontWeight: "bold" },
   weekdayRow: {
     flexDirection: "row",
     justifyContent: "space-between",

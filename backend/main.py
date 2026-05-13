@@ -68,9 +68,9 @@ def seed_database(db: Session = Depends(get_db)):
     garden_stats = [
         models.GardenStats(
             solHealth=90,
-            humidity=70,
+            humidity=30,
             temperature=20,
-            soilType="Drainant et riche en compost",
+            soilType="Terre naturelle",
             totalSize="50 m²"
         )
     ]
@@ -80,30 +80,20 @@ def seed_database(db: Session = Depends(get_db)):
         models.CurrentVegetable(name="Tomate Cerise Sweet Million", status="Sprout", plantedDate=datetime(2026, 3, 20), icon="Sprout"),
         models.CurrentVegetable(name="Tomate Cœur de Bœuf", status="Leaf", plantedDate=datetime(2026, 3, 15), icon="Leaf"),
         models.CurrentVegetable(name="Tomate Noire de Crimée", status="Sprout", plantedDate=datetime(2026, 4, 1), icon="Sprout"),
-        models.CurrentVegetable(name="Tomate Saint-Pierre", status="Leaf", plantedDate=datetime(2026, 3, 25), icon="Leaf"),
-        models.CurrentVegetable(name="Tomate Andine Cornue", status="Sprout", plantedDate=datetime(2026, 4, 5), icon="Sprout"),
-        models.CurrentVegetable(name="Tomate Ananas", status="Leaf", plantedDate=datetime(2026, 3, 10), icon="Leaf"),
-        models.CurrentVegetable(name="Tomate Green Zebra", status="Sprout", plantedDate=datetime(2026, 4, 10), icon="Sprout"),
         models.CurrentVegetable(name="Tomate San Marzano", status="Leaf", plantedDate=datetime(2026, 3, 18), icon="Leaf"),
-        models.CurrentVegetable(name="Tomate Brandywine", status="Sprout", plantedDate=datetime(2026, 4, 2), icon="Sprout"),
-        models.CurrentVegetable(name="Tomate Yellow Pear", status="Leaf", plantedDate=datetime(2026, 3, 30), icon="Leaf"),
     ]
 
     # ToPlant - Variétés de tomates à semer ou planter en mai 2026
     to_plant = [
-        models.ToPlant(name="Tomate Black Cherry", urgency="Haute"),
-        models.ToPlant(name="Tomate Blue Berries", urgency="Haute"),
-        models.ToPlant(name="Tomate White Queen", urgency="Moyenne"),
-        models.ToPlant(name="Tomate Purple Calabash", urgency="Moyenne"),
-        models.ToPlant(name="Tomate Gold Medal", urgency="Basse"),
-        models.ToPlant(name="Tomate Hillbilly Potato Leaf", urgency="Basse"),
-        models.ToPlant(name="Tomate Cherokee Purple", urgency="Haute"),
-        models.ToPlant(name="Tomate Sungold", urgency="Moyenne"),
+        models.ToPlant(name="Tomate Cerise Sweet Million", urgency="Haute"),
+        models.ToPlant(name="Tomate Cœur de Bœuf", urgency="Moyenne"),
+        models.ToPlant(name="Tomate Noire de Crimée", urgency="Haute"),
+        models.ToPlant(name="Tomate San Marzano", urgency="Moyenne"),
     ]
 
-    # LibraryItem - 20+ variétés de tomates avec conseils experts
+    # LibraryItem - 4 variétés de tomates avec conseils experts
     base_start = date(2026, 5, 11)
-    offsets = [0, 1, 3, 5, 6, 8, 10, 12, 14, 16, 18, 20, 21, 23, 25, 27, 28, 30, 32, 34]
+    offsets = [0, 7, 14, 21]
     library_seed = [
         {
             "name": "Tomate Cerise Sweet Million",
@@ -127,123 +117,11 @@ def seed_database(db: Session = Depends(get_db)):
             "tips": "Variété résistante à la sécheresse. Semis en intérieur 8 semaines avant les dernières gelées. Espacement de 50 cm entre les plants."
         },
         {
-            "name": "Tomate Saint-Pierre",
-            "period": "70-80 jours",
-            "season": "Printemps-Été",
-            "waterNeeds": "Élevées",
-            "tips": "Idéale pour les climats frais. Associez avec des œillets d'Inde pour éloigner les nématodes. Paillage recommandé."
-        },
-        {
-            "name": "Tomate Andine Cornue",
-            "period": "80-90 jours",
-            "season": "Printemps-Été",
-            "waterNeeds": "Élevées",
-            "tips": "Forme allongée, parfaite pour les sauces. Tuteurez solidement. Évitez l'excès d'eau en fin de culture pour concentrer les saveurs."
-        },
-        {
-            "name": "Tomate Ananas",
-            "period": "85-95 jours",
-            "season": "Printemps-Été",
-            "waterNeeds": "Élevées",
-            "tips": "Fruits jaunes striés de rouge, très sucrés. Plantez en plein soleil. Récoltez à maturité complète pour un goût optimal."
-        },
-        {
-            "name": "Tomate Green Zebra",
-            "period": "75-85 jours",
-            "season": "Printemps-Été",
-            "waterNeeds": "Modérées",
-            "tips": "Variété originale à rayures vertes et jaunes. Goût acidulé. Supporte bien la chaleur. Arrosage régulier mais sans excès."
-        },
-        {
             "name": "Tomate San Marzano",
             "period": "80-90 jours",
             "season": "Printemps-Été",
             "waterNeeds": "Élevées",
             "tips": "Tomate italienne idéale pour les coulis. Plantez en lignes espacées de 60 cm. Tuteurez et pincez les gourmands."
-        },
-        {
-            "name": "Tomate Brandywine",
-            "period": "85-100 jours",
-            "season": "Printemps-Été",
-            "waterNeeds": "Élevées",
-            "tips": "Variété ancienne à feuilles de pomme de terre. Goût exceptionnel. Sensible au mildiou : traitez préventivement au purin de prêle."
-        },
-        {
-            "name": "Tomate Yellow Pear",
-            "period": "70-80 jours",
-            "season": "Printemps-Été",
-            "waterNeeds": "Modérées",
-            "tips": "Petits fruits jaunes en forme de poire. Très productive. Parfaite pour les salades. Résiste bien aux maladies."
-        },
-        {
-            "name": "Tomate Black Cherry",
-            "period": "65-75 jours",
-            "season": "Printemps-Été",
-            "waterNeeds": "Élevées",
-            "tips": "Tomates cerises noires, très sucrées. Plantez en pot ou en pleine terre. Arrosage quotidien en période de sécheresse."
-        },
-        {
-            "name": "Tomate Blue Berries",
-            "period": "70-80 jours",
-            "season": "Printemps-Été",
-            "waterNeeds": "Modérées",
-            "tips": "Petits fruits bleus à maturité. Variété résistante au froid. Idéale pour les climats tempérés. Goût fruité et légèrement acidulé."
-        },
-        {
-            "name": "Tomate White Queen",
-            "period": "80-90 jours",
-            "season": "Printemps-Été",
-            "waterNeeds": "Modérées",
-            "tips": "Tomates blanches, douces et peu acides. Parfaite pour les enfants. Plantez en situation ensoleillée mais à l'abri du vent."
-        },
-        {
-            "name": "Tomate Purple Calabash",
-            "period": "85-95 jours",
-            "season": "Printemps-Été",
-            "waterNeeds": "Élevées",
-            "tips": "Fruits violets et côtelés. Variété rare, saveur riche et complexe. Tuteurez et pincez pour favoriser la ramification."
-        },
-        {
-            "name": "Tomate Gold Medal",
-            "period": "80-90 jours",
-            "season": "Printemps-Été",
-            "waterNeeds": "Modérées",
-            "tips": "Gros fruits roses, très charnus. Variété ancienne américaine. Espacement de 70 cm entre les plants. Récoltez avant pleine maturité pour éviter les fentes."
-        },
-        {
-            "name": "Tomate Hillbilly Potato Leaf",
-            "period": "90-100 jours",
-            "season": "Printemps-Été",
-            "waterNeeds": "Élevées",
-            "tips": "Feuillage de type pomme de terre. Fruits jaunes rayés de rouge, très gros. Sensible aux maladies : surveillez l'humidité."
-        },
-        {
-            "name": "Tomate Cherokee Purple",
-            "period": "80-90 jours",
-            "season": "Printemps-Été",
-            "waterNeeds": "Élevées",
-            "tips": "Variété héritage, très populaire aux États-Unis. Goût riche et sucré. Plantez en sol profond et bien drainé."
-        },
-        {
-            "name": "Tomate Sungold",
-            "period": "55-65 jours",
-            "season": "Printemps-Été",
-            "waterNeeds": "Élevées",
-            "tips": "Tomate cerise orange, très sucrée. Variété précoce et productive. Arrosage régulier pour éviter le stress hydrique."
-        },
-        {
-            "name": "Tomate Black Krim",
-            "period": "70-80 jours",
-            "season": "Printemps-Été",
-            "waterNeeds": "Modérées",
-            "tips": "Originaire de Crimée, fruits noirs-rouges. Goût salé et complexe. Résiste bien à la sécheresse une fois installée."
-        },
-        {
-            "name": "Tomate Yellow Brandywine",
-            "period": "85-95 jours",
-            "season": "Printemps-Été",
-            "waterNeeds": "Élevées",
-            "tips": "Variante jaune de la Brandywine. Fruits très gros et peu acides. Tuteurez solidement. Évitez les sols trop humides."
         }
     ]
 
