@@ -7,6 +7,7 @@ import {
     Text,
     View,
 } from "react-native";
+import { API_URL } from "../../constants/api";
 
 export default function GardenScreen() {
   const [data, setData] = useState<any>(null);
@@ -14,10 +15,10 @@ export default function GardenScreen() {
 
   useEffect(() => {
     Promise.all([
-      fetch("http://172.23.119.189:8000/api/garden-stats").then((res) =>
+      fetch(`${API_URL}/api/garden-stats`).then((res) =>
         res.json(),
       ),
-      fetch("http://172.23.119.189:8000/api/current-vegetables").then((res) =>
+      fetch(`${API_URL}/api/current-vegetables`).then((res) =>
         res.json(),
       ),
     ])
