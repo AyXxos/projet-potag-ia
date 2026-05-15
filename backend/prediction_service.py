@@ -7,19 +7,39 @@ from datetime import datetime
 BASE_DIR = Path(__file__).parent
 MODEL_DIR = BASE_DIR / "IA" / "models"
 
+# Cache pour les modèles
+_models_cache = {}
+
+def load_artifacts():
+    if not _models_cache:
+        try:
+            _models_cache["model"] = joblib.load(MODEL_DIR / "modele_potagia.joblib")
+            _models_cache["le_var"] = joblib.load(MODEL_DIR / "encodeur_varietes.joblib")
+            _models_cache["le_sol"] = joblib.load(MODEL_DIR / "encodeur_sols.joblib")
+            _models_cache["scaler"] = joblib.load(MODEL_DIR / "scaler.joblib")
+            _models_cache["features_list"] = joblib.load(MODEL_DIR / "features_list.joblib")
+            _models_cache["perf"] = joblib.load(MODEL_DIR / "performance.joblib")
+        except Exception as e:
+            print(f"❌ ERREUR CHARGEMENT ARTEFACTS : {e}")
+    return _models_cache
+
 def get_prediction(variete: str, meteo: dict, soil_stats: dict, user_overrides: dict = None):
     """
     Interface entre le service météo et le modèle ML Potag'IA.
     Prend en compte les mesures manuelles de l'utilisateur si fournies.
     """
     try:
-        # 1. Charger les artefacts
-        model = joblib.load(MODEL_DIR / "modele_potagia.joblib")
-        le_var = joblib.load(MODEL_DIR / "encodeur_varietes.joblib")
-        le_sol = joblib.load(MODEL_DIR / "encodeur_sols.joblib")
-        scaler = joblib.load(MODEL_DIR / "scaler.joblib")
-        features_list = joblib.load(MODEL_DIR / "features_list.joblib")
-        perf = joblib.load(MODEL_DIR / "performance.joblib")
+        # 1. Charger les artefacts (via cache)
+        artifacts = load_artifacts()
+        if not artifacts:
+            return 0, 0, {}
+            
+        model = artifacts["model"]
+        le_var = artifacts["le_var"]
+        le_sol = artifacts["le_sol"]
+        scaler = artifacts["scaler"]
+        features_list = artifacts["features_list"]
+        perf = artifacts["perf"]
         
         # 2. Encodage Variété avec fallback
         try:
@@ -40,27 +60,25 @@ def get_prediction(variete: str, meteo: dict, soil_stats: dict, user_overrides: 
         # 4. Extraction du mois (Saisonnalité)
         date_meteo = meteo.get("date", datetime.now().strftime("%Y-%m-%d"))
         try:
-            # Format attendu : YYYY-MM-DD
             mois = int(date_meteo.split("-")[1])
         except:
             mois = datetime.now().month
 
-        # 5. Gestion des overrides et simulation V0
+        # 5. Gestion des overrides et simulation DÉTERMINISTE V0
+        # On utilise le nom de la variété comme graine pour que la simulation 
+        # soit toujours la même pour un légume donné.
+        rng = random.Random(variete)
         overrides = user_overrides or {}
         
-        # Simulation sol de qualité (V0)
-        n_sim = overrides.get('n', random.randint(110, 140))
-        p_sim = overrides.get('p', random.randint(70, 90))
-        k_sim = overrides.get('k', random.randint(130, 160))
-        ph_sim = overrides.get('ph', round(random.uniform(6.2, 6.8), 1))
-        om_sim = overrides.get('organic_matter', round(random.uniform(4.0, 5.5), 1))
+        n_sim = overrides.get('n', rng.randint(110, 140))
+        p_sim = overrides.get('p', rng.randint(70, 90))
+        k_sim = overrides.get('k', rng.randint(130, 160))
+        ph_sim = overrides.get('ph', round(rng.uniform(6.2, 6.8), 1))
+        om_sim = overrides.get('organic_matter', round(rng.uniform(4.0, 5.5), 1))
 
         # Ajustement météo démo
         temp_air_sim = meteo.get('temp_air', 20)
-        if temp_air_sim < 15: temp_air_sim = random.randint(18, 24)
-        
         temp_sol_sim = meteo.get('temp_sol', 15)
-        if temp_sol_sim < 12: temp_sol_sim = random.randint(14, 18)
 
         # 6. Construction du dictionnaire de données
         full_data = {
@@ -69,42 +87,41 @@ def get_prediction(variete: str, meteo: dict, soil_stats: dict, user_overrides: 
             'Temp_Sol': temp_sol_sim,
             'Humidite_Sol': meteo.get('humidite_sol', 65),
             'N': n_sim, 'P': p_sim, 'K': k_sim,
-            'Prevision_Gelee': 0, # Forcé à 0 pour démo V0
+            'Prevision_Gelee': meteo.get('prevision_gelee', 0),
             'Mois': mois,
             'PH_Level': ph_sim,
             'Organic_Matter': om_sim,
             'Moisture_Content': meteo.get('humidite_sol', 65),
             'Soil_Type_Encoded': soil_type_enc,
             'Diff_Temp': temp_air_sim - temp_sol_sim,
-            'Sol_Chaud': 1,
-            'Gel_Risque': 0,
+            'Sol_Chaud': 1 if temp_sol_sim > 15 else 0,
+            'Gel_Risque': 1 if meteo.get('prevision_gelee') == 1 or temp_air_sim < 5 else 0,
             'Ratio_NP': n_sim / (p_sim + 0.1),
             'Ratio_NK': n_sim / (k_sim + 0.1)
         }
         
         # 7. Préparation finale (filtrage et ordre des colonnes)
         X = pd.DataFrame([full_data])
-        # S'assurer que TOUTES les features attendues sont présentes
         for col in features_list:
             if col not in X.columns:
                 X[col] = 0
         
         X_final = X[features_list]
-        X_scaled = scaler.transform(X_final)
+        X_scaled_array = scaler.transform(X_final)
+        # Re-créer un DataFrame avec les noms de colonnes pour éviter le UserWarning de sklearn
+        X_scaled = pd.DataFrame(X_scaled_array, columns=features_list)
         
         # 8. Prédiction
-        score = float(model.predict(X_final_scaled)[0]) if 'X_final_scaled' in locals() else float(model.predict(X_scaled)[0])
+        score = float(model.predict(X_scaled)[0])
         
         # Règle de sécurité finale
         if meteo.get('prevision_gelee') == 1: 
             score = 0
             
-        # --- CORRECTION SÉRIALISATION JSON ---
-        # Convertir les types NumPy (int64, float64) en types Python natifs (int, float)
-        # pour éviter l'erreur PydanticSerializationError
+        # Conversion types NumPy
         data_serializable = {}
         for k, v in full_data.items():
-            if hasattr(v, "item"): # Est-ce un type NumPy ?
+            if hasattr(v, "item"): 
                 data_serializable[k] = v.item()
             else:
                 data_serializable[k] = v

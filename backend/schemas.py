@@ -74,3 +74,4 @@ class BestDateResponse(BaseModel):
     statut: str
     conseil: str
     daily_scores: list[dict]
+    top_5_days: list[dict]
