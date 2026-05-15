@@ -1,15 +1,23 @@
 import { AlertCircle, Calendar as CalendarIcon } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Modal,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 import { API_URL } from "../../constants/api";
+import {
+  AiCachePayload,
+  fetchFreshAiData,
+  getAiCache,
+  getStoredLocation,
+  isAiCacheStale,
+  prefetchAiCache,
+} from "../lib/ai-cache";
 
 export default function DashboardScreen() {
   const [data, setData] = useState<any>(null);
@@ -21,6 +29,7 @@ export default function DashboardScreen() {
     day: number;
   } | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [aiCache, setAiCache] = useState<AiCachePayload | null>(null);
 
   useEffect(() => {
     // Utilisation de l'IP de la machine locale pour les requêtes réseau depuis l'app
@@ -34,6 +43,31 @@ export default function DashboardScreen() {
         console.error(err);
         setLoading(false);
       });
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadAiData = async () => {
+      const cached = await getAiCache();
+      if (isMounted && cached) {
+        setAiCache(cached);
+      }
+      
+      const coords = await getStoredLocation();
+      const data = await prefetchAiCache({
+        lat: coords.lat,
+        lon: coords.lon,
+      });
+      
+      if (isMounted) {
+        setAiCache(data);
+      }
+    };
+
+    loadAiData();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const now = new Date();
@@ -58,12 +92,26 @@ export default function DashboardScreen() {
     "Decembre",
   ];
   const weekdayLabels = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
-  const tomatoVarietiesByDay: Record<number, string[]> = {
-    12: ["Tomate Cerise Sweet Million"],
-    15: ["Tomate Cœur de Bœuf"],
-    18: ["Tomate Noire de Crimée"],
-    22: ["Tomate San Marzano"],
-  };
+  const tomatoVarietiesByDay: Record<number, string[]> = {};
+  if (aiCache?.items) {
+    Object.values(aiCache.items).forEach((entry) => {
+      const bestDate = entry.bestDate?.best_date;
+      if (!bestDate) return;
+      const parsed = new Date(bestDate);
+      if (Number.isNaN(parsed.getTime())) return;
+      if (
+        parsed.getFullYear() !== viewYear ||
+        parsed.getMonth() !== viewMonthIndex
+      ) {
+        return;
+      }
+      const day = parsed.getDate();
+      if (!tomatoVarietiesByDay[day]) {
+        tomatoVarietiesByDay[day] = [];
+      }
+      tomatoVarietiesByDay[day].push(entry.displayName || "Tomate");
+    });
+  }
   const tomatoDays = Object.keys(tomatoVarietiesByDay).map((day) =>
     Number(day),
   );
@@ -183,7 +231,9 @@ export default function DashboardScreen() {
               <Text style={styles.modalValue}>
                 {selectedDate && tomatoVarietiesByDay[selectedDate.day]?.length
                   ? `Tomates: ${tomatoVarietiesByDay[selectedDate.day].join(", ")}`
-                  : "Aucune recommandation"}
+                  : aiCache
+                    ? "Aucune recommandation"
+                    : "Analyse IA en cours"}
               </Text>
             </View>
             <View style={styles.modalSection}>
@@ -202,58 +252,6 @@ export default function DashboardScreen() {
         </View>
       </Modal>
 
-      {/* Reminder Card */}
-      <View style={styles.reminderCard}>
-        <View style={styles.reminderRow}>
-          <AlertCircle
-            color="#F59E0B"
-            size={24}
-            style={{ marginRight: 12, marginTop: 4 }}
-          />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.reminderTitle}>Quoi planter aujourd'hui ?</Text>
-            <Text style={styles.reminderDesc}>
-              Le climat est idéal pour semer vos graines de radis en pleine
-              terre. N'oubliez pas d'arroser après le semis !
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      {/* To plant this week */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>À planter cette semaine</Text>
-        {data?.toPlantThisWeek ? (
-          data.toPlantThisWeek.map((item: any) => (
-            <View key={item.id} style={styles.plantCard}>
-              <Text style={styles.plantName}>{item.name}</Text>
-              <View
-                style={[
-                  styles.badge,
-                  item.urgency === "Haute"
-                    ? styles.badgeHigh
-                    : styles.badgeMedium,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.badgeText,
-                    item.urgency === "Haute"
-                      ? styles.badgeHighText
-                      : styles.badgeMediumText,
-                  ]}
-                >
-                  {item.urgency}
-                </Text>
-              </View>
-            </View>
-          ))
-        ) : (
-          <Text style={{ textAlign: "center", marginTop: 10 }}>
-            Aucune donnée (Vérifiez le backend).
-          </Text>
-        )}
-      </View>
     </ScrollView>
   );
 }

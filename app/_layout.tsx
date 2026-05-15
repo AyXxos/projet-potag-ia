@@ -1,9 +1,9 @@
-import {
-    DarkTheme,
-    DefaultTheme,
-    ThemeProvider,
-} from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import {
+  DarkTheme,
+  DefaultTheme,
+  ThemeProvider,
+} from "@react-navigation/native";
 import * as Location from "expo-location";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -12,6 +12,7 @@ import { Alert, Linking } from "react-native";
 import "react-native-reanimated";
 
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { getStoredLocation, prefetchAiCache } from "./lib/ai-cache";
 
 export const unstable_settings = {
   anchor: "(tabs)",
@@ -29,39 +30,50 @@ export default function RootLayout() {
       try {
         const enabledValue = await AsyncStorage.getItem(locationEnabledKey);
         const enabled = enabledValue !== "false";
-        if (!enabled) {
-          return;
-        }
+        if (enabled) {
+          const response = await Location.requestForegroundPermissionsAsync();
+          await AsyncStorage.setItem(locationStatusKey, response.status);
 
-        const response = await Location.requestForegroundPermissionsAsync();
-        await AsyncStorage.setItem(locationStatusKey, response.status);
+          if (response.status !== "granted") {
+            await AsyncStorage.removeItem(locationValueKey);
+            await AsyncStorage.removeItem(locationUpdatedKey);
+          }
 
-        if (response.status !== "granted") {
-          await AsyncStorage.removeItem(locationValueKey);
-          await AsyncStorage.removeItem(locationUpdatedKey);
-        }
+          if (response.status === "granted") {
+            const position = await Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.Balanced,
+            });
+            const value = `${position.coords.latitude.toFixed(4)}, ${position.coords.longitude.toFixed(4)}`;
+            await AsyncStorage.setItem(locationValueKey, value);
+            await AsyncStorage.setItem(
+              locationUpdatedKey,
+              new Date().toISOString(),
+            );
+          }
 
-        if (response.status === "granted") {
-          const position = await Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.Balanced,
-          });
-          const value = `${position.coords.latitude.toFixed(4)}, ${position.coords.longitude.toFixed(4)}`;
-          await AsyncStorage.setItem(locationValueKey, value);
-          await AsyncStorage.setItem(locationUpdatedKey, new Date().toISOString());
-        }
-
-        if (response.status !== "granted" && response.canAskAgain === false) {
-          Alert.alert(
-            "Autorisation localisation",
-            "Veuillez autoriser la localisation dans les reglages pour activer les recommandations.",
-            [
-              { text: "Annuler", style: "cancel" },
-              { text: "Ouvrir les reglages", onPress: () => Linking.openSettings() },
-            ],
-          );
+          if (response.status !== "granted" && response.canAskAgain === false) {
+            Alert.alert(
+              "Autorisation localisation",
+              "Veuillez autoriser la localisation dans les reglages pour activer les recommandations.",
+              [
+                { text: "Annuler", style: "cancel" },
+                {
+                  text: "Ouvrir les reglages",
+                  onPress: () => Linking.openSettings(),
+                },
+              ],
+            );
+          }
         }
       } catch (error) {
         console.error(error);
+      } finally {
+        try {
+          const coords = await getStoredLocation();
+          await prefetchAiCache({ lat: coords.lat, lon: coords.lon });
+        } catch (error) {
+          console.error(error);
+        }
       }
     };
 
