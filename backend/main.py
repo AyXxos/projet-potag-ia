@@ -5,6 +5,8 @@ from datetime import date
 import models
 import schemas
 from database import engine, get_db
+import weather_service
+import prediction_service
 
 # Create database tables
 models.Base.metadata.create_all(bind=engine)
@@ -14,7 +16,9 @@ app = FastAPI(title="E-Potager API")
 # Setup CORS to allow your React frontend to communicate with the API
 origins = [
     "http://localhost:5173", # Vite default port
-    "http://127.0.0.1:5173"
+    "http://127.0.0.1:5173",
+    "http://localhost:19006", # Expo Web
+    "*" # Pour le dev mobile
 ]
 
 app.add_middleware(
@@ -28,6 +32,79 @@ app.add_middleware(
 @app.get("/")
 def read_root():
     return {"message": "Bienvenue sur l'API E-Potager"}
+
+@app.post("/ai/predict", response_model=schemas.PredictionResponse)
+def predict_plantation_ai(req: schemas.PredictionRequest, db: Session = Depends(get_db)):
+    # ... (code existant)
+    forecast = weather_service.get_weather_forecast(req.lat, req.lon, days=1)
+    if not forecast:
+        raise HTTPException(status_code=503, detail="Service météo indisponible")
+    meteo = forecast[0]
+    
+    garden_stats = db.query(models.GardenStats).first()
+    soil_data = {"soilType": garden_stats.soilType if garden_stats else "Loamy"}
+    
+    user_overrides = {k: v for k, v in {
+        'n': req.n, 'p': req.p, 'k': req.k,
+        'ph': req.ph, 'organic_matter': req.organic_matter
+    }.items() if v is not None}
+    
+    score, fiabilite, data_used = prediction_service.get_prediction(
+        req.variete, meteo, soil_data, user_overrides
+    )
+    
+    from IA.train_potagia_ai import obtenir_recommandation
+    statut, conseil = obtenir_recommandation(score, meteo["prevision_gelee"])
+    
+    return {
+        "score": round(score, 2), "fiabilite": fiabilite, "statut": statut, "conseil": conseil, "meteo": meteo, "data_used": data_used
+    }
+
+@app.post("/ai/best-planting-date", response_model=schemas.BestDateResponse)
+def get_best_planting_date(req: schemas.PredictionRequest, db: Session = Depends(get_db)):
+    # 1. Prévisions sur 7 jours
+    forecast = weather_service.get_weather_forecast(req.lat, req.lon, days=7)
+    if not forecast:
+        raise HTTPException(status_code=503, detail="Prévisions indisponibles")
+    
+    # 2. Stats sol
+    garden_stats = db.query(models.GardenStats).first()
+    soil_data = {"soilType": garden_stats.soilType if garden_stats else "Loamy"}
+    user_overrides = {k: v for k, v in {
+        'n': req.n, 'p': req.p, 'k': req.k, 
+        'ph': req.ph, 'organic_matter': req.organic_matter
+    }.items() if v is not None}
+
+    # 3. Calculer les scores pour chaque jour
+    daily_results = []
+    for day_meteo in forecast:
+        score, fiabilite, _ = prediction_service.get_prediction(
+            req.variete, day_meteo, soil_data, user_overrides
+        )
+        daily_results.append({
+            "date": day_meteo["date"],
+            "score": round(score, 2),
+            "prevision_gelee": day_meteo["prevision_gelee"]
+        })
+    
+    # 4. Trouver le meilleur jour
+    best_result = max(daily_results, key=lambda x: x["score"])
+    
+    # 5. Formater recommandation finale
+    from IA.train_potagia_ai import obtenir_recommandation
+    statut, conseil = obtenir_recommandation(best_result["score"], best_result["prevision_gelee"])
+    
+    return {
+        "best_date": best_result["date"],
+        "best_score": best_result["score"],
+        "statut": statut,
+        "conseil": conseil,
+        "daily_scores": daily_results
+    }
+
+@app.post("/api/predict-plantation", response_model=schemas.PredictionResponse)
+def predict_plantation(req: schemas.PredictionRequest, db: Session = Depends(get_db)):
+    return predict_plantation_ai(req, db)
 
 # --- GARDEN STATS ---
 @app.get("/api/garden-stats", response_model=schemas.GardenStats)
@@ -52,98 +129,41 @@ def get_to_plant_list(db: Session = Depends(get_db)):
 def get_library(db: Session = Depends(get_db)):
     return db.query(models.LibraryItem).all()
 
-# --- SEED ROUTE (Pour initialiser facilement la BDD) ---
+# --- SEED ROUTE ---
 @app.post("/api/seed")
 def seed_database(db: Session = Depends(get_db)):
     from datetime import datetime, date, timedelta
     import models
 
-    # Effacer les données existantes
     db.query(models.GardenStats).delete()
     db.query(models.CurrentVegetable).delete()
     db.query(models.ToPlant).delete()
     db.query(models.LibraryItem).delete()
 
-    # GardenStats - Conditions idéales pour la culture des tomates en printemps (mai 2026, France)
-    garden_stats = [
-        models.GardenStats(
-            solHealth=90,
-            humidity=30,
-            temperature=20,
-            soilType="Terre naturelle",
-            totalSize="50 m²"
-        )
-    ]
-
-    # CurrentVegetable - Variétés de tomates actuellement en terre (plantées entre mars et avril 2026)
+    garden_stats = [models.GardenStats(solHealth=90, humidity=30, temperature=20, soilType="Loamy", totalSize="50 m²")]
+    
     current_vegetables = [
-        models.CurrentVegetable(name="Tomate Cerise Sweet Million", status="Sprout", plantedDate=datetime(2026, 3, 20), icon="Sprout"),
-        models.CurrentVegetable(name="Tomate Cœur de Bœuf", status="Leaf", plantedDate=datetime(2026, 3, 15), icon="Leaf"),
-        models.CurrentVegetable(name="Tomate Noire de Crimée", status="Sprout", plantedDate=datetime(2026, 4, 1), icon="Sprout"),
-        models.CurrentVegetable(name="Tomate San Marzano", status="Leaf", plantedDate=datetime(2026, 3, 18), icon="Leaf"),
+        models.CurrentVegetable(name="Marmande", status="Sprout", plantedDate=date(2026, 3, 20), icon="Sprout"),
+        models.CurrentVegetable(name="Cerise", status="Leaf", plantedDate=date(2026, 3, 15), icon="Leaf"),
     ]
 
-    # ToPlant - Variétés de tomates à semer ou planter en mai 2026
     to_plant = [
-        models.ToPlant(name="Tomate Cerise Sweet Million", urgency="Haute"),
-        models.ToPlant(name="Tomate Cœur de Bœuf", urgency="Moyenne"),
-        models.ToPlant(name="Tomate Noire de Crimée", urgency="Haute"),
-        models.ToPlant(name="Tomate San Marzano", urgency="Moyenne"),
+        models.ToPlant(name="Marmande", urgency="Haute"),
+        models.ToPlant(name="Cerise", urgency="Moyenne"),
     ]
 
-    # LibraryItem - 4 variétés de tomates avec conseils experts
-    base_start = date(2026, 5, 11)
-    offsets = [0, 7, 14, 21]
     library_seed = [
-        {
-            "name": "Tomate Cerise Sweet Million",
-            "period": "60-70 jours",
-            "season": "Printemps-Été",
-            "waterNeeds": "Élevées",
-            "tips": "Variété très productive. Tuteurez dès la plantation. Pincez les gourmands régulièrement. Arrosage au pied pour éviter le mildiou."
-        },
-        {
-            "name": "Tomate Cœur de Bœuf",
-            "period": "80-90 jours",
-            "season": "Printemps-Été",
-            "waterNeeds": "Élevées",
-            "tips": "Plantez en poquet de 2-3 pieds. Supprimez les feuilles basses pour aérer la base. Récoltez quand le fruit est bien rouge et légèrement mou."
-        },
-        {
-            "name": "Tomate Noire de Crimée",
-            "period": "75-85 jours",
-            "season": "Printemps-Été",
-            "waterNeeds": "Modérées",
-            "tips": "Variété résistante à la sécheresse. Semis en intérieur 8 semaines avant les dernières gelées. Espacement de 50 cm entre les plants."
-        },
-        {
-            "name": "Tomate San Marzano",
-            "period": "80-90 jours",
-            "season": "Printemps-Été",
-            "waterNeeds": "Élevées",
-            "tips": "Tomate italienne idéale pour les coulis. Plantez en lignes espacées de 60 cm. Tuteurez et pincez les gourmands."
-        }
+        {"name": "Marmande", "period": "75 jours", "season": "Printemps", "waterNeeds": "Élevées", "tips": "Tuteurez tôt."},
+        {"name": "Cerise", "period": "60 jours", "season": "Printemps", "waterNeeds": "Moyennes", "tips": "Productive."},
     ]
 
     library_items = []
-    for item, offset in zip(library_seed, offsets):
-        start = base_start + timedelta(days=offset)
-        end = start + timedelta(days=6)
-        exact = start + timedelta(days=2)
-        library_items.append(
-            models.LibraryItem(
-                name=item["name"],
-                period=item["period"],
-                plantingStart=start,
-                plantingEnd=end,
-                plantingDate=exact,
-                season=item["season"],
-                waterNeeds=item["waterNeeds"],
-                tips=item["tips"]
-            )
-        )
+    for item in library_seed:
+        library_items.append(models.LibraryItem(
+            name=item["name"], period=item["period"], plantingStart=date(2026, 5, 1), 
+            plantingEnd=date(2026, 5, 30), plantingDate=date(2026, 5, 15), 
+            season=item["season"], waterNeeds=item["waterNeeds"], tips=item["tips"]))
 
-    # Ajout de toutes les données à la session
     db.add_all(garden_stats + current_vegetables + to_plant + library_items)
     db.commit()
-    return {"message": "Base de données initialisée avec succès avec le dataset Mistral !"}
+    return {"message": "Base de données initialisée !"}

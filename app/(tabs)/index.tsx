@@ -9,6 +9,7 @@ import {
     Text,
     View,
 } from "react-native";
+import { API_URL } from "../../constants/api";
 
 export default function DashboardScreen() {
   const [data, setData] = useState<any>(null);
@@ -23,7 +24,7 @@ export default function DashboardScreen() {
 
   useEffect(() => {
     // Utilisation de l'IP de la machine locale pour les requêtes réseau depuis l'app
-    fetch("http://172.23.119.189:8000/api/to-plant")
+    fetch(`${API_URL}/api/to-plant`)
       .then((res) => res.json())
       .then((res) => {
         setData({ toPlantThisWeek: res });

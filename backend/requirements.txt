@@ -9,3 +9,6 @@ numpy
 scikit-learn
 joblib
 requests
+joblib
+pandas
+scikit-learn
