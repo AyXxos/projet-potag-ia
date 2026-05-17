@@ -16,31 +16,15 @@ class GardenStats(GardenStatsBase):
 class CurrentVegetableBase(BaseModel):
     name: str
     status: str
-    plantedDate: date
-    icon: str
 
 class CurrentVegetable(CurrentVegetableBase):
     id: int
     class Config:
         from_attributes = True
 
-class ToPlantBase(BaseModel):
-    name: str
-    urgency: str
-
-class ToPlant(ToPlantBase):
-    id: int
-    class Config:
-        from_attributes = True
-
 class LibraryItemBase(BaseModel):
     name: str
-    period: str
-    plantingStart: date
-    plantingEnd: date
-    plantingDate: date
     season: str
-    waterNeeds: str
     tips: str
 
 class LibraryItem(LibraryItemBase):

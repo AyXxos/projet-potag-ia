@@ -154,14 +154,6 @@ export default function LibraryScreen() {
     });
   };
 
-  const formatWeekRange = (start?: string, end?: string) => {
-    const s = formatDayMonth(start);
-    const e = formatDayMonth(end);
-    return s === "Non defini" || e === "Non defini"
-      ? "Non defini"
-      : `${s} au ${e}`;
-  };
-
   return (
     <View style={styles.container}>
       <View style={styles.searchContainer}>

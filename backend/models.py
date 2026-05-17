@@ -17,25 +17,11 @@ class CurrentVegetable(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
     status = Column(String)
-    plantedDate = Column(Date)
-    icon = Column(String)
-
-class ToPlant(Base):
-    __tablename__ = "to_plant"
-
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, index=True)
-    urgency = Column(String)
 
 class LibraryItem(Base):
     __tablename__ = "library"
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
-    period = Column(String)
-    plantingStart = Column(Date)
-    plantingEnd = Column(Date)
-    plantingDate = Column(Date)
     season = Column(String)
-    waterNeeds = Column(String)
     tips = Column(String)

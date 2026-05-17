@@ -147,11 +147,6 @@ def get_garden_stats(db: Session = Depends(get_db)):
 def get_current_vegetables(db: Session = Depends(get_db)):
     return db.query(models.CurrentVegetable).all()
 
-# --- TO PLANT ---
-@app.get("/api/to-plant", response_model=list[schemas.ToPlant])
-def get_to_plant_list(db: Session = Depends(get_db)):
-    return db.query(models.ToPlant).all()
-
 # --- LIBRARY ---
 @app.get("/api/library", response_model=list[schemas.LibraryItem])
 def get_library(db: Session = Depends(get_db)):
@@ -165,33 +160,26 @@ def seed_database(db: Session = Depends(get_db)):
 
     db.query(models.GardenStats).delete()
     db.query(models.CurrentVegetable).delete()
-    db.query(models.ToPlant).delete()
     db.query(models.LibraryItem).delete()
 
     garden_stats = [models.GardenStats(solHealth=90, humidity=30, temperature=20, soilType="Loamy", totalSize="50 m²")]
     
     current_vegetables = [
-        models.CurrentVegetable(name="Marmande", status="Sprout", plantedDate=date(2026, 3, 20), icon="Sprout"),
-        models.CurrentVegetable(name="Cerise", status="Leaf", plantedDate=date(2026, 3, 15), icon="Leaf"),
-    ]
-
-    to_plant = [
-        models.ToPlant(name="Marmande", urgency="Haute"),
-        models.ToPlant(name="Cerise", urgency="Moyenne"),
+        models.CurrentVegetable(name="Marmande", status="Sprout"),
+        models.CurrentVegetable(name="Cerise", status="Leaf"),
     ]
 
     library_seed = [
-        {"name": "Marmande", "period": "75 jours", "season": "Printemps", "waterNeeds": "Élevées", "tips": "Tuteurez tôt."},
-        {"name": "Cerise", "period": "60 jours", "season": "Printemps", "waterNeeds": "Moyennes", "tips": "Productive."},
+        {"name": "Marmande", "season": "Printemps", "tips": "Tuteurez tôt."},
+        {"name": "Cerise", "season": "Printemps", "tips": "Productive."},
     ]
 
     library_items = []
     for item in library_seed:
         library_items.append(models.LibraryItem(
-            name=item["name"], period=item["period"], plantingStart=date(2026, 5, 1), 
-            plantingEnd=date(2026, 5, 30), plantingDate=date(2026, 5, 15), 
-            season=item["season"], waterNeeds=item["waterNeeds"], tips=item["tips"]))
+            name=item["name"],
+            season=item["season"], tips=item["tips"]))
 
-    db.add_all(garden_stats + current_vegetables + to_plant + library_items)
+    db.add_all(garden_stats + current_vegetables + library_items)
     db.commit()
     return {"message": "Base de données initialisée !"}

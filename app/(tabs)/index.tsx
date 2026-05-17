@@ -21,7 +21,7 @@ import {
 
 export default function DashboardScreen() {
   const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [viewMonthIndex, setViewMonthIndex] = useState(4); // Mai 2026
   const [selectedDate, setSelectedDate] = useState<{
     year: number;
@@ -32,17 +32,7 @@ export default function DashboardScreen() {
   const [aiCache, setAiCache] = useState<AiCachePayload | null>(null);
 
   useEffect(() => {
-    // Utilisation de l'IP de la machine locale pour les requêtes réseau depuis l'app
-    fetch(`${API_URL}/api/to-plant`)
-      .then((res) => res.json())
-      .then((res) => {
-        setData({ toPlantThisWeek: res });
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error(err);
-        setLoading(false);
-      });
+    // Initialisation simple si nécessaire
   }, []);
 
   useEffect(() => {
