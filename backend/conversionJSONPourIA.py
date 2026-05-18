@@ -1,11 +1,17 @@
+import os
 import pandas as pd
 import json
 import requests
 from pathlib import Path
+from dotenv import load_dotenv
 
-API_KEY = "ca9a3d9e25eaf89e454181917b70ca1e"
+load_dotenv()
+
+API_KEY = os.getenv("OPENWEATHER_API_KEY")
+if not API_KEY:
+    raise RuntimeError("Missing OPENWEATHER_API_KEY in environment or .env file")
 CITY = "Chantepie"
-URL = f"http://api.openweathermap.org/data/2.5/weather?q={CITY},FR&APPID={API_KEY}&units=metric"
+URL = f"https://api.openweathermap.org/data/2.5/weather?q={CITY},FR&APPID={API_KEY}&units=metric"
 
 # Chemins des fichiers
 BASE_DIR = Path(__file__).parent

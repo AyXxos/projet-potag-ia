@@ -3,11 +3,13 @@ Générateur de données corrélées pour Potag'IA
 Génère des données avec des relations causales réalistes ET intègre les données météo
 """
 
+import os
 import pandas as pd
 import numpy as np
 from pathlib import Path
 import requests
 import json
+from dotenv import load_dotenv
 
 np.random.seed(42)
 
@@ -17,9 +19,13 @@ print("🌱 Génération de données CORRÉLÉES avec relations causales...\n")
 # 1. RÉCUPÉRER LES DONNÉES MÉTÉO EN TEMPS RÉEL
 # ==========================================
 
-API_KEY = "ca9a3d9e25eaf89e454181917b70ca1e"
+load_dotenv()
+
+API_KEY = os.getenv("OPENWEATHER_API_KEY")
+if not API_KEY:
+    raise RuntimeError("Missing OPENWEATHER_API_KEY in environment or .env file")
 CITY = "Chantepie"
-URL = f"http://api.openweathermap.org/data/2.5/weather?q={CITY},FR&APPID={API_KEY}&units=metric"
+URL = f"https://api.openweathermap.org/data/2.5/weather?q={CITY},FR&APPID={API_KEY}&units=metric"
 
 print("📡 Récupération des données météo en temps réel...")
 
