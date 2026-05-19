@@ -115,23 +115,16 @@ def get_prediction(variete: str, meteo: dict, soil_stats: dict, user_overrides: 
         
         # 7. Préparation finale (filtrage et ordre des colonnes)
         X = pd.DataFrame([full_data])
+        
+        # S'assurer que TOUTES les colonnes attendues par le scaler/modèle sont là
         for col in features_list:
             if col not in X.columns:
                 X[col] = 0
         
+        # Filtrer pour ne garder QUE les colonnes du modèle dans le BON ORDRE
         X_final = X[features_list]
-        X_scaled_array = scaler.transform(X_final)
-        # Re-créer un DataFrame avec les noms de colonnes pour éviter le UserWarning de sklearn
-        X_scaled = pd.DataFrame(X_scaled_array, columns=features_list)
         
-        # 8. Prédiction
-        score = float(model.predict(X_scaled)[0])
-        
-        # Règle de sécurité finale
-        if meteo.get('prevision_gelee') == 1: 
-            score = 0
-            
-        # Conversion types NumPy
+        # Conversion types NumPy pour data_serializable AVANT le transform potentiellement risqué
         data_serializable = {}
         for k, v in full_data.items():
             if hasattr(v, "item"): 
@@ -139,10 +132,28 @@ def get_prediction(variete: str, meteo: dict, soil_stats: dict, user_overrides: 
             else:
                 data_serializable[k] = v
 
+        try:
+            X_scaled_array = scaler.transform(X_final)
+            # Re-créer un DataFrame avec les noms de colonnes pour éviter le UserWarning de sklearn
+            X_scaled = pd.DataFrame(X_scaled_array, columns=features_list)
+            
+            # 8. Prédiction
+            score = float(model.predict(X_scaled)[0])
+        except Exception as scaler_err:
+            print(f"⚠️ Erreur Scaler/Model: {scaler_err}. Fallback Heuristique.")
+            # Fallback si le scaler/modèle rejette les colonnes (ex: mismatch version)
+            score = 70.0
+            if gel_sim == 1: score = 0
+            data_serializable['error_detail'] = str(scaler_err)
+        
+        # Règle de sécurité finale
+        if meteo.get('prevision_gelee') == 1: 
+            score = 0
+            
         return max(0, min(100, score)), fiabilite, data_serializable
 
     except Exception as e:
         import traceback
-        print(f"❌ ERREUR INFÉRENCE : {str(e)}")
+        print(f"❌ ERREUR CRITIQUE INFÉRENCE : {str(e)}")
         traceback.print_exc()
-        return 0, 0, {}
+        return 0, 0, {"error": str(e)}
