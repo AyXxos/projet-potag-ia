@@ -67,7 +67,17 @@ def get_weather_forecast(lat: float, lon: float, days: int = 7):
             })
 
         if not forecast:
-            return []
+            print("⚠️ API Météo indisponible, utilisation de données fictives (MOCK)")
+            for i in range(days):
+                date_str = (datetime.now() + timedelta(days=i)).strftime("%Y-%m-%d")
+                forecast.append({
+                    "date": date_str,
+                    "temp_air": 22.5,
+                    "temp_sol": 18.0,
+                    "humidite_sol": 65,
+                    "prevision_gelee": 0
+                })
+            return forecast
 
         # Fallback pour atteindre le nombre de jours demandés (ex: 60)
         if days > len(forecast):
@@ -91,5 +101,15 @@ def get_weather_forecast(lat: float, lon: float, days: int = 7):
                 
         return forecast[:days]
     except Exception as e:
-        print(f"Erreur Forecast API: {e}")
-        return []
+        print(f"Erreur Forecast API: {e}, utilisation de données fictives (MOCK)")
+        mock_forecast = []
+        for i in range(days):
+            date_str = (datetime.now() + timedelta(days=i)).strftime("%Y-%m-%d")
+            mock_forecast.append({
+                "date": date_str,
+                "temp_air": 22.5,
+                "temp_sol": 18.0,
+                "humidite_sol": 65,
+                "prevision_gelee": 0
+            })
+        return mock_forecast

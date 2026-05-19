@@ -29,10 +29,46 @@ def get_prediction(variete: str, meteo: dict, soil_stats: dict, user_overrides: 
     Prend en compte les mesures manuelles de l'utilisateur si fournies.
     """
     try:
+        # Mois pour la saisonnalité
+        date_meteo = meteo.get("date", datetime.now().strftime("%Y-%m-%d"))
+        try:
+            mois = int(date_meteo.split("-")[1])
+        except:
+            mois = datetime.now().month
+
+        # Simulation DÉTERMINISTE des données manquantes
+        rng = random.Random(variete)
+        overrides = user_overrides or {}
+        n_sim = overrides.get('n', rng.randint(110, 140))
+        p_sim = overrides.get('p', rng.randint(70, 90))
+        k_sim = overrides.get('k', rng.randint(130, 160))
+        ph_sim = overrides.get('ph', round(rng.uniform(6.2, 6.8), 1))
+        om_sim = overrides.get('organic_matter', round(rng.uniform(4.0, 5.5), 1))
+        
+        temp_air_sim = meteo.get('temp_air', 20)
+        temp_sol_sim = meteo.get('temp_sol', 15)
+        hum_sim = meteo.get('humidite_sol', 65)
+        gel_sim = meteo.get('prevision_gelee', 0)
+
         # 1. Charger les artefacts (via cache)
         artifacts = load_artifacts()
         if not artifacts:
-            return 0, 0, {}
+            # FALLBACK MOCK TOTAL SI PAS DE MODÈLE
+            print("⚠️ Modèle non chargé, utilisation d'une simulation heuristique")
+            # Score de base selon température et gel
+            mock_score = 75.0
+            if gel_sim == 1 or temp_air_sim < 5: mock_score = 0
+            elif temp_air_sim < 15: mock_score -= 20
+            elif temp_air_sim > 30: mock_score -= 15
+            
+            data_mock = {
+                'N': n_sim, 'P': p_sim, 'K': k_sim, 'PH_Level': ph_sim, 
+                'Organic_Matter': om_sim, 'Temp_Air_Moy': temp_air_sim, 
+                'Temp_Sol': temp_sol_sim, 'Prevision_Gelee': gel_sim,
+                'Mois': mois, 'Soil_Type': soil_stats.get("soilType", "Loamy"),
+                'is_mock': True
+            }
+            return max(0, min(100, mock_score)), 80.0, data_mock
             
         model = artifacts["model"]
         le_var = artifacts["le_var"]
@@ -56,46 +92,23 @@ def get_prediction(variete: str, meteo: dict, soil_stats: dict, user_overrides: 
             soil_type_enc = le_sol.transform([soil_type])[0]
         except:
             soil_type_enc = le_sol.transform(["Loamy"])[0]
-        
-        # 4. Extraction du mois (Saisonnalité)
-        date_meteo = meteo.get("date", datetime.now().strftime("%Y-%m-%d"))
-        try:
-            mois = int(date_meteo.split("-")[1])
-        except:
-            mois = datetime.now().month
-
-        # 5. Gestion des overrides et simulation DÉTERMINISTE V0
-        # On utilise le nom de la variété comme graine pour que la simulation 
-        # soit toujours la même pour un légume donné.
-        rng = random.Random(variete)
-        overrides = user_overrides or {}
-        
-        n_sim = overrides.get('n', rng.randint(110, 140))
-        p_sim = overrides.get('p', rng.randint(70, 90))
-        k_sim = overrides.get('k', rng.randint(130, 160))
-        ph_sim = overrides.get('ph', round(rng.uniform(6.2, 6.8), 1))
-        om_sim = overrides.get('organic_matter', round(rng.uniform(4.0, 5.5), 1))
-
-        # Ajustement météo démo
-        temp_air_sim = meteo.get('temp_air', 20)
-        temp_sol_sim = meteo.get('temp_sol', 15)
 
         # 6. Construction du dictionnaire de données
         full_data = {
             'Variete_Encoded': var_enc,
             'Temp_Air_Moy': temp_air_sim,
             'Temp_Sol': temp_sol_sim,
-            'Humidite_Sol': meteo.get('humidite_sol', 65),
+            'Humidite_Sol': hum_sim,
             'N': n_sim, 'P': p_sim, 'K': k_sim,
-            'Prevision_Gelee': meteo.get('prevision_gelee', 0),
+            'Prevision_Gelee': gel_sim,
             'Mois': mois,
             'PH_Level': ph_sim,
             'Organic_Matter': om_sim,
-            'Moisture_Content': meteo.get('humidite_sol', 65),
+            'Moisture_Content': hum_sim,
             'Soil_Type_Encoded': soil_type_enc,
             'Diff_Temp': temp_air_sim - temp_sol_sim,
             'Sol_Chaud': 1 if temp_sol_sim > 15 else 0,
-            'Gel_Risque': 1 if meteo.get('prevision_gelee') == 1 or temp_air_sim < 5 else 0,
+            'Gel_Risque': 1 if gel_sim == 1 or temp_air_sim < 5 else 0,
             'Ratio_NP': n_sim / (p_sim + 0.1),
             'Ratio_NK': n_sim / (k_sim + 0.1)
         }
